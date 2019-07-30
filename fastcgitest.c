@@ -54,7 +54,7 @@ void printTable(PGconn *conn, FCGX_Request request) {
     	}
     	FCGX_PutS("</tr>", request.out);
     }
-    FCGX_PutS("</table></div>", request.out);
+    FCGX_PutS("</table></div>\r\n", request.out);
     PQclear(res);
 }
 
@@ -130,74 +130,87 @@ int main(void)
 			//free(buf);
 		}
 		else {
-	        //вывести все HTTP-заголовки (каждый заголовок с новой строки) 
-	        FCGX_PutS("Content-type: text/html\r\n", request.out); 
-	        //между заголовками и телом ответа нужно вывести пустую строку 
-	        FCGX_PutS("\r\n", request.out); 
-	        //вывести тело ответа (например - html-код веб-страницы) 
-	        FCGX_PutS("<html>\r\n", request.out); 
-	        FCGX_PutS("<head>\r\n", request.out); 
-	        FCGX_PutS("<meta charset=\"utf-8\">\r\n", request.out); 
-	        FCGX_PutS("<title>База данных гостиницы</title>\r\n", request.out);
-	        FCGX_PutS("</head>\r\n", request.out); 
-	        FCGX_PutS("<body>\r\n", request.out); 
+	        FCGX_PutS("\
+Content-type: text/html\r\n\
+\r\n\
+<html>\r\n\
+<head>\r\n\
+<meta charset=\"utf-8\">\r\n\
+<title>База данных гостиницы</title>\r\n\
+</head>\r\n\
+<body>\r\n\
+<button id=\"delete\">Удалить</button>\r\n\
+<button id=\"add\">Добавить</button>\r\n\
+<button id=\"file\">Добавить из файла</button>\r\n\
+<button id=\"pass\">Сменить пароль</button>\r\n\
+<br>\r\n\
+<input>\r\n\
+<br>\r\n\
+", request.out); 
 	    	printTable(conn, request);
-		    FCGX_PutS("<script>\r\n", request.out);
-		    FCGX_PutS("function transformNumberToName(i) {\r\n", request.out);
-		    FCGX_PutS("if (i == 0) { return \"ФИО\"; }\r\n", request.out);
-		    FCGX_PutS("if (i == 1) { return \"Паспорт\"; }\r\n", request.out);
-		    FCGX_PutS("if (i == 2) { return \"\\\"Дата заезда\\\"\"; }\r\n", request.out);
-		    FCGX_PutS("if (i == 3) { return \"\\\"Дата отъезда\\\"\"; }\r\n", request.out);
-		    FCGX_PutS("if (i == 4) { return \"Номер\"; }\r\n", request.out);
-		    FCGX_PutS("}\r\n", request.out);
-		    FCGX_PutS("var blockEditInput = false;\r\n", request.out);
-	        FCGX_PutS("var inputs = document.getElementsByTagName(\"td\");\r\n", request.out);
-			FCGX_PutS("for (var i = 0; i < inputs.length; i++) {\r\n", request.out);
-	  		FCGX_PutS("inputs[i].addEventListener(\"click\", tdClickListener);\r\n", request.out);
-	  		FCGX_PutS("inputs[i].addEventListener(\"keypress\", enterKeyListener);\r\n", request.out);
-			FCGX_PutS("}\r\n", request.out);
-			FCGX_PutS("function enterKeyListener(e) {\r\n", request.out);
-			FCGX_PutS("if (e.keyCode == 13) {\r\n", request.out);
-			FCGX_PutS("var r = /\\d+/g;\r\n", request.out);
-			FCGX_PutS("var m;\r\n", request.out);
-			FCGX_PutS("m = this.id.match(r);\r\n", request.out);
-			FCGX_PutS("var xhr = new XMLHttpRequest();\r\n", request.out);
-	    	FCGX_PutS("xhr.open(\'POST\', \'http://localhost/\', true);\r\n", request.out);
-	    	FCGX_PutS("var val = document.getElementsByTagName(\'input\')[0].value;\r\n", request.out);
-	    	FCGX_PutS("if (m[1] != 4) { val = \"\\\'\" + val + \"\\\'\"; }\r\n", request.out);
-	    	FCGX_PutS("xhr.send(\"update Гостиница set \" + transformNumberToName(m[1]) + \" = \" + val + \" where id = \" + m[0] + \";\");\0", request.out);
+	    	//FCGX_PutS("<br>\r\n", request.out);
+	    	FCGX_PutS("\
+<button id=\"prev\"><</button>\r\n\
+<button id=\"next\">></button>\r\n\
+<script>\r\n\
+	function transformNumberToName(i) {\r\n\
+		if (i == 0) { return \"ФИО\"; }\r\n\
+		if (i == 1) { return \"Паспорт\"; }\r\n\
+		if (i == 2) { return \"\\\"Дата заезда\\\"\"; }\r\n\
+		if (i == 3) { return \"\\\"Дата отъезда\\\"\"; }\r\n\
+		if (i == 4) { return \"Номер\"; }\r\n\
+	}\r\n\
+	var blockEditInput = false;\r\n\
+	var inputs = document.getElementsByTagName(\"td\");\r\n\
+	document.getElementById(\'add\').addEventListener(\"click\", addButtonListener);\r\n\
+	for (var i = 0; i < inputs.length; i++) {\r\n\
+		inputs[i].addEventListener(\"click\", tdClickListener);\r\n\
+		inputs[i].addEventListener(\"keypress\", enterKeyListener);\r\n\
+	}\r\n\
+	function enterKeyListener(e) {\r\n\
+		if (e.keyCode == 13) {\r\n\
+			var r = /\\d+/g;\r\n\
+			var m;\r\n\
+			m = this.id.match(r);\r\n\
+			var xhr = new XMLHttpRequest();\r\n\
+			xhr.open(\'POST\', \'http://localhost/\', true);\r\n\
+			var val = document.getElementsByTagName(\'input\')[1].value;\r\n\
+			if (m[1] != 4) { val = \"\\\'\" + val + \"\\\'\"; }\r\n\
+			xhr.send(\"update Гостиница set \" + transformNumberToName(m[1]) + \" = \" + val + \" where id = \" + m[0] + \";\");\0\
+			", request.out);
 	    	//FCGX_PutS("if (xhr.status != 200) {\r\n", request.out);
   			//FCGX_PutS("alert( xhr.status + \': \' + xhr.statusText );\r\n", request.out);
 			//FCGX_PutS("} else {\r\n", request.out);
-			FCGX_PutS("xhr.onreadystatechange = function() {\r\n", request.out);
-    		FCGX_PutS("if (xhr.readyState == XMLHttpRequest.DONE) {\r\n", request.out);
-    		FCGX_PutS("document.body.getElementsByTagName(\'div\')[0].remove();\r\n", request.out);
-  			FCGX_PutS("var div = document.createElement(\'div\');\r\n", request.out);
-  			FCGX_PutS("div.innerHTML = xhr.responseText;\r\n", request.out);
-  			FCGX_PutS("document.body.insertBefore(div, document.body.firstChild);\r\n", request.out);
-  			FCGX_PutS("var inputs = document.getElementsByTagName(\"td\");\r\n", request.out);
-			FCGX_PutS("for (var i = 0; i < inputs.length; i++) {\r\n", request.out);
-	  		FCGX_PutS("inputs[i].addEventListener(\"click\", tdClickListener);\r\n", request.out);
-	  		FCGX_PutS("inputs[i].addEventListener(\"keypress\", enterKeyListener);\r\n", request.out);
-			FCGX_PutS("}\r\n", request.out);
-			//FCGX_PutS("}\r\n", request.out);
-	    	FCGX_PutS("blockEditInput = false;}}}}\r\n", request.out);
-			FCGX_PutS("function tdClickListener() {\r\n", request.out);
-			FCGX_PutS("if (!blockEditInput) {", request.out);
-			//FCGX_PutS("var len = document.getElementById(this.id).innerText.length;\r\n", request.out);
-	    	FCGX_PutS("document.getElementById(this.id).innerHTML = \"\";\r\n", request.out);
-	    	FCGX_PutS("var newInput = document.createElement('input');\r\n", request.out);
-	    	//FCGX_PutS("newInput.size = len;\r\n", request.out);
-	    	FCGX_PutS("var len = this.offsetWidth;\r\n", request.out);
-	    	FCGX_PutS("newInput.style = \"padding: 0; border: 0; margin: 0; width: \" + len + \"px\";\r\n", request.out);
-	    	FCGX_PutS("document.getElementById(this.id).appendChild(newInput);\r\n", request.out);
-	    	FCGX_PutS("blockEditInput = true;\r\n", request.out);
-	    	//FCGX_PutS("document.getElementById(this.id).onkeyup = enterKeyListener;\r\n", request.out);
-	    	//FCGX_PutS("\r\n", request.out);
-			FCGX_PutS("}}\r\n", request.out);
-			FCGX_PutS("</script>\r\n", request.out);
-	        FCGX_PutS("</body>\r\n", request.out); 
-	        FCGX_PutS("</html>\r\n", request.out); 
+			FCGX_PutS("\
+			xhr.onreadystatechange = function() {\r\n\
+				if (xhr.readyState == XMLHttpRequest.DONE) {\r\n\
+					document.body.getElementsByTagName(\'div\')[0].remove();\r\n\
+					var div = document.createElement(\'div\');\r\n\
+					div.innerHTML = xhr.responseText;\r\n\
+					document.body.insertBefore(div, document.body.getElementsByTagName(\'button\')[4]);\r\n\
+					var inputs = document.getElementsByTagName(\"td\");\r\n\
+					for (var i = 0; i < inputs.length; i++) {\r\n\
+						inputs[i].addEventListener(\"click\", tdClickListener);\r\n\
+						inputs[i].addEventListener(\"keypress\", enterKeyListener);\r\n\
+					}\r\n\
+					blockEditInput = false;}}}}\r\n\
+	function tdClickListener() {\r\n\
+		if (!blockEditInput) {\r\n\
+			var len = this.offsetWidth;\r\n\
+			document.getElementById(this.id).innerHTML = \"\";\r\n\
+			var newInput = document.createElement(\'input\');\r\n\
+			newInput.style = \"padding: 0; border: 0; margin: 0; width: \" + len + \"px\";\r\n\
+			document.getElementById(this.id).appendChild(newInput);\r\n\
+			blockEditInput = true;\r\n\
+	}}\r\n\
+	function addButtonListener() {\r\n\
+		//var newTr = document.createElement(\'tr\');\r\n\
+		//document.body.insertBefore(div, document.body.getElementsByTagName(\'br\')[2]);\r\n\
+	}\r\n\
+</script>\r\n\
+</body>\r\n\
+</html>\r\n\
+", request.out);
 
 	        //закрыть текущее соединение 
 	        //FCGX_Finish_r(&request); 
