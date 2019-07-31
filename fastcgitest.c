@@ -31,7 +31,7 @@ void printTable(PGconn *conn, FCGX_Request request) {
         do_exit(conn);
     }
     int ncols = PQnfields(res);
-    FCGX_PutS("<div><table border=\"1\"><tr>", request.out);
+    FCGX_PutS("<table border=\"1\"><tr>", request.out);
     for (int i = 0; i < ncols - 1; i++) {
     	FCGX_PutS("<th>", request.out);
     	FCGX_PutS(PQfname(res, i), request.out);
@@ -54,7 +54,7 @@ void printTable(PGconn *conn, FCGX_Request request) {
     	}
     	FCGX_PutS("</tr>", request.out);
     }
-    FCGX_PutS("</table></div>\r\n", request.out);
+    FCGX_PutS("</table>\r\n", request.out);
     PQclear(res);
 }
 
@@ -137,6 +137,14 @@ int main(void)
 	        FCGX_PutS("\r\n", request.out); 
 			printTable(conn, request);
 		}
+		else if (buf[0] == 'd' && buf[1] == 'e' && buf[2] == 'l') {
+			PQexec(conn, buf);
+			printf("%s", PQerrorMessage(conn));
+			printf("%s", buf);
+			FCGX_PutS("Content-type: text/html\r\n", request.out); 
+	        FCGX_PutS("\r\n", request.out); 
+			printTable(conn, request);
+		}
 		else {
 	        FCGX_PutS("\
 Content-type: text/html\r\n\
@@ -147,17 +155,19 @@ Content-type: text/html\r\n\
 <title>База данных гостиницы</title>\r\n\
 </head>\r\n\
 <body>\r\n\
-<button id=\"delete\">Удалить</button>\r\n\
+<button id=\"del\">Удалить</button>\r\n\
 <button id=\"add\">Добавить</button>\r\n\
 <button id=\"file\">Добавить из файла</button>\r\n\
 <button id=\"pass\">Сменить пароль</button>\r\n\
 <br>\r\n\
 <input>\r\n\
 <br>\r\n\
+<div>\
 ", request.out); 
 	    	printTable(conn, request);
 	    	//FCGX_PutS("<br>\r\n", request.out);
 	    	FCGX_PutS("\
+</div>\
 <button id=\"prev\"><</button>\r\n\
 <button id=\"next\">></button>\r\n\
 <script>\r\n\
@@ -169,8 +179,10 @@ Content-type: text/html\r\n\
 		if (i == 4) { return \"Номер\"; }\r\n\
 	}\r\n\
 	var blockEditInput = false;\r\n\
+	var del = false;\r\n\
 	var inputs = document.getElementsByTagName(\"td\");\r\n\
 	document.getElementById(\'add\').addEventListener(\"click\", addButtonListener);\r\n\
+	document.getElementById(\'del\').addEventListener(\"click\", deleteButtonListener);\r\n\
 	for (var i = 0; i < inputs.length; i++) {\r\n\
 		inputs[i].addEventListener(\"click\", tdClickListener);\r\n\
 		inputs[i].addEventListener(\"keypress\", enterKeyListener);\r\n\
@@ -210,7 +222,31 @@ Content-type: text/html\r\n\
 			newInput.style = \"padding: 0; border: 0; margin: 0; width: \" + len + \"px\";\r\n\
 			document.getElementById(this.id).appendChild(newInput);\r\n\
 			blockEditInput = true;\r\n\
-	}}\r\n\
+		}\r\n\
+		if (del == true) {\r\n\
+			var r = /\\d+/g;\r\n\
+			var m;\r\n\
+			m = this.id.match(r);\r\n\
+			var xhr = new XMLHttpRequest();\r\n\
+			xhr.open(\'POST\', \'http://localhost/\', true);\r\n\
+			xhr.send(\"delete from Гостиница where id = \" + m[0] + \";\");\r\n\
+			xhr.onreadystatechange = function() {\r\n\
+				if (xhr.readyState == XMLHttpRequest.DONE) {\r\n\
+					document.body.getElementsByTagName(\'div\')[0].remove();\r\n\
+					var div = document.createElement(\'div\');\r\n\
+					div.innerHTML = xhr.responseText;\r\n\
+					document.body.insertBefore(div, document.body.getElementsByTagName(\'button\')[4]);\r\n\
+					var inputs = document.getElementsByTagName(\"td\");\r\n\
+					for (var i = 0; i < inputs.length; i++) {\r\n\
+						inputs[i].addEventListener(\"click\", tdClickListener);\r\n\
+						inputs[i].addEventListener(\"keypress\", enterKeyListener);\r\n\
+					}\r\n\
+					blockEditInput = false;\r\n\
+					del = false;\r\n\
+				}\r\n\
+			}\r\n\
+		}\r\n\
+	}\r\n\
 	function enterKeyListenerAdd(e) {\r\n\
 		if (e.keyCode == 13) {\r\n\
 			var inputs = document.getElementsByTagName(\"input\");\r\n\
@@ -244,6 +280,12 @@ Content-type: text/html\r\n\
 				inputs[i].style.border = 0;\r\n\
 				inputs[i].style.margin = 0;\r\n\
 			}\r\n\
+			blockEditInput = true;\r\n\
+		}\r\n\
+	}\r\n\
+	function deleteButtonListener() {\r\n\
+		if (blockEditInput == false) {\r\n\
+			del = true;\r\n\
 			blockEditInput = true;\r\n\
 		}\r\n\
 	}\r\n\
