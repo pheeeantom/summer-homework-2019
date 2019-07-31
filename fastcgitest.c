@@ -129,6 +129,14 @@ int main(void)
 			//FCGX_Finish_r(&request); 
 			//free(buf);
 		}
+		else if (buf[0] == 'i' && buf[1] == 'n' && buf[2] == 's') {
+			PQexec(conn, buf);
+			printf("%s", PQerrorMessage(conn));
+			printf("%s", buf);
+			FCGX_PutS("Content-type: text/html\r\n", request.out); 
+	        FCGX_PutS("\r\n", request.out); 
+			printTable(conn, request);
+		}
 		else {
 	        FCGX_PutS("\
 Content-type: text/html\r\n\
@@ -203,9 +211,41 @@ Content-type: text/html\r\n\
 			document.getElementById(this.id).appendChild(newInput);\r\n\
 			blockEditInput = true;\r\n\
 	}}\r\n\
+	function enterKeyListenerAdd(e) {\r\n\
+		if (e.keyCode == 13) {\r\n\
+			var inputs = document.getElementsByTagName(\"input\");\r\n\
+			var xhr = new XMLHttpRequest();\r\n\
+			xhr.open(\'POST\', \'http://localhost/\', true);\r\n\
+			xhr.send(\"insert into Гостиница (ФИО, Паспорт, \\\"Дата заезда\\\", \\\"Дата отъезда\\\", Номер) values (\\\'\" + inputs[1].value + \"\\\', \\\'\" + inputs[2].value + \"\\\', \\\'\" + inputs[3].value + \"\\\', \\\'\" + inputs[4].value + \"\\\', \" + inputs[5].value + \");\");\r\n\
+			xhr.onreadystatechange = function() {\r\n\
+				if (xhr.readyState == XMLHttpRequest.DONE) {\r\n\
+					document.body.getElementsByTagName(\'div\')[0].remove();\r\n\
+					var div = document.createElement(\'div\');\r\n\
+					div.innerHTML = xhr.responseText;\r\n\
+					document.body.insertBefore(div, document.body.getElementsByTagName(\'button\')[4]);\r\n\
+					var inputs = document.getElementsByTagName(\"td\");\r\n\
+					for (var i = 0; i < inputs.length; i++) {\r\n\
+						inputs[i].addEventListener(\"click\", tdClickListener);\r\n\
+						inputs[i].addEventListener(\"keypress\", enterKeyListener);\r\n\
+					}\r\n\
+					blockEditInput = false;}}\r\n\
+		}\r\n\
+	}\r\n\
 	function addButtonListener() {\r\n\
-		//var newTr = document.createElement(\'tr\');\r\n\
-		//document.body.insertBefore(div, document.body.getElementsByTagName(\'br\')[2]);\r\n\
+		if (blockEditInput == false) {\r\n\
+			var ths = document.getElementsByTagName(\"th\");\r\n\
+			var newTr = document.createElement(\'tr\');\r\n\
+			newTr.innerHTML = \"<td><input style=\\\"width: \" + ths[0].offsetWidth + \";\\\"></td><td><input style=\\\"width: \" + ths[1].offsetWidth + \";\\\"></td><td><input style=\\\"width: \" + ths[2].offsetWidth + \";\\\"></td><td><input style=\\\"width: \" + ths[3].offsetWidth + \";\\\"></td><td><input style=\\\"width: \" + ths[4].offsetWidth + \";\\\"></td>\";\r\n\
+			document.getElementsByTagName(\'table\')[0].appendChild(newTr);\r\n\
+			var inputs = document.getElementsByTagName(\"input\");\r\n\
+			for (var i = 1; i < inputs.length; i++) {\r\n\
+				inputs[i].addEventListener(\"keypress\", enterKeyListenerAdd);\r\n\
+				inputs[i].style.padding = 0;\r\n\
+				inputs[i].style.border = 0;\r\n\
+				inputs[i].style.margin = 0;\r\n\
+			}\r\n\
+			blockEditInput = true;\r\n\
+		}\r\n\
 	}\r\n\
 </script>\r\n\
 </body>\r\n\
