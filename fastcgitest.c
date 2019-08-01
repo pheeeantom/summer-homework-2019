@@ -23,8 +23,14 @@ void do_exit(PGconn *conn) {
 	if (i == 4) return "Номер";
 }*/
 
-void printTable(PGconn *conn, FCGX_Request request) {
-	PGresult *res = PQexec(conn, "select*from Гостиница");    
+void printTable(PGconn *conn, FCGX_Request request, char * offset, char * limit) {
+	char * query = malloc(100);
+	strcpy(query, "select*from Гостиница offset ");
+	strcat(query, offset);
+	strcat(query, " limit ");
+	strcat(query, limit);
+	strcat(query, ";");
+	PGresult *res = PQexec(conn, query);    
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         printf("No data retrieved\n");        
         PQclear(res);
@@ -106,6 +112,8 @@ int main(void)
 		//char * clStr = FCGX_GetParam("CONTENT_LENGTH", request.envp);
 		//int cl = atoi(clStr);
 		char * buf = malloc(500);
+		char * offset = malloc(10);
+		char * limit = malloc(10);
 		FCGX_GetStr(buf, 500, request.in);
 		char * ach = strchr(buf, '\x3B');
 		printf("%ld", ach - buf + 1);
@@ -113,6 +121,10 @@ int main(void)
 
 		}
 		else {
+			strncpy(offset, ach + 1, (strchr(buf, '\x2F') - buf) - (ach - buf + 1));
+			offset[(strchr(buf, '\x2F') - buf) - (ach - buf + 1)] = '\0';
+			strncpy(limit, strchr(buf, '\x2F') + 1, strchr(buf, '\x24') - strchr(buf, '\x2F') - 1);
+			limit[strchr(buf, '\x24') - strchr(buf, '\x2F') - 1] = '\0';
 			buf[(int)(ach - buf + 1)] = '\0';
 		}
 
@@ -125,7 +137,7 @@ int main(void)
 			printf("%s", buf);
 			FCGX_PutS("Content-type: text/html\r\n", request.out); 
 	        FCGX_PutS("\r\n", request.out); 
-			printTable(conn, request);
+			printTable(conn, request, offset, limit);
 			//FCGX_Finish_r(&request); 
 			//free(buf);
 		}
@@ -135,7 +147,7 @@ int main(void)
 			printf("%s", buf);
 			FCGX_PutS("Content-type: text/html\r\n", request.out); 
 	        FCGX_PutS("\r\n", request.out); 
-			printTable(conn, request);
+			printTable(conn, request, offset, limit);
 		}
 		else if (buf[0] == 'd' && buf[1] == 'e' && buf[2] == 'l') {
 			PQexec(conn, buf);
@@ -143,7 +155,22 @@ int main(void)
 			printf("%s", buf);
 			FCGX_PutS("Content-type: text/html\r\n", request.out); 
 	        FCGX_PutS("\r\n", request.out); 
-			printTable(conn, request);
+			printTable(conn, request, offset, limit);
+		}
+		else if (buf[0] == 's' && buf[1] == 'e' && buf[2] == 'l') {
+			FCGX_PutS("Content-type: text/html\r\n", request.out); 
+	        FCGX_PutS("\r\n", request.out); 
+			printTable(conn, request, offset, limit);
+		}
+		else if (buf[0] == 'a' && buf[1] == 'm' && buf[2] == 'o') {
+			char * str = malloc(10);
+			PGresult *res = PQexec(conn, "select * from Гостиница;");
+			int row_num = PQntuples(res);
+			PQclear(res);
+			sprintf(str, "%d", row_num);
+			FCGX_PutS("Content-type: text/html\r\n", request.out); 
+	        FCGX_PutS("\r\n", request.out); 
+			FCGX_PutS(str, request.out);
 		}
 		else {
 	        FCGX_PutS("\
@@ -164,7 +191,7 @@ Content-type: text/html\r\n\
 <br>\r\n\
 <div>\
 ", request.out); 
-	    	printTable(conn, request);
+	    	printTable(conn, request, "0", "5");
 	    	//FCGX_PutS("<br>\r\n", request.out);
 	    	FCGX_PutS("\
 </div>\
@@ -178,11 +205,25 @@ Content-type: text/html\r\n\
 		if (i == 3) { return \"\\\"Дата отъезда\\\"\"; }\r\n\
 		if (i == 4) { return \"Номер\"; }\r\n\
 	}\r\n\
+	var offset = 0;\r\n\
+	var limit = 5;\r\n\
 	var blockEditInput = false;\r\n\
 	var del = false;\r\n\
+	var amount = \
+			", request.out);
+			char * str = malloc(10);
+			PGresult *res = PQexec(conn, "select * from Гостиница;");
+			int row_num = PQntuples(res);
+			PQclear(res);
+			sprintf(str, "%d", row_num);
+			FCGX_PutS(str, request.out);
+	    	FCGX_PutS("\
+	;\r\n\
 	var inputs = document.getElementsByTagName(\"td\");\r\n\
 	document.getElementById(\'add\').addEventListener(\"click\", addButtonListener);\r\n\
 	document.getElementById(\'del\').addEventListener(\"click\", deleteButtonListener);\r\n\
+	document.getElementById(\'prev\').addEventListener(\"click\", prevButtonListener);\r\n\
+	document.getElementById(\'next\').addEventListener(\"click\", nextButtonListener);\r\n\
 	for (var i = 0; i < inputs.length; i++) {\r\n\
 		inputs[i].addEventListener(\"click\", tdClickListener);\r\n\
 		inputs[i].addEventListener(\"keypress\", enterKeyListener);\r\n\
@@ -196,7 +237,7 @@ Content-type: text/html\r\n\
 			xhr.open(\'POST\', \'http://localhost/\', true);\r\n\
 			var val = document.getElementsByTagName(\'input\')[1].value;\r\n\
 			if (m[1] != 4) { val = \"\\\'\" + val + \"\\\'\"; }\r\n\
-			xhr.send(\"update Гостиница set \" + transformNumberToName(m[1]) + \" = \" + val + \" where id = \" + m[0] + \";\");\0\
+			xhr.send(\"update Гостиница set \" + transformNumberToName(m[1]) + \" = \" + val + \" where id = \" + m[0] + \";\" + offset + \"/\" + limit + \"$\");\0\
 			", request.out);
 	    	//FCGX_PutS("if (xhr.status != 200) {\r\n", request.out);
   			//FCGX_PutS("alert( xhr.status + \': \' + xhr.statusText );\r\n", request.out);
@@ -229,7 +270,7 @@ Content-type: text/html\r\n\
 			m = this.id.match(r);\r\n\
 			var xhr = new XMLHttpRequest();\r\n\
 			xhr.open(\'POST\', \'http://localhost/\', true);\r\n\
-			xhr.send(\"delete from Гостиница where id = \" + m[0] + \";\");\r\n\
+			xhr.send(\"delete from Гостиница where id = \" + m[0] + \";\" + offset + \"/\" + limit + \"$\");\r\n\
 			xhr.onreadystatechange = function() {\r\n\
 				if (xhr.readyState == XMLHttpRequest.DONE) {\r\n\
 					document.body.getElementsByTagName(\'div\')[0].remove();\r\n\
@@ -243,6 +284,15 @@ Content-type: text/html\r\n\
 					}\r\n\
 					blockEditInput = false;\r\n\
 					del = false;\r\n\
+					//amount--;\r\n\
+				}\r\n\
+			}\r\n\
+			var xhr1 = new XMLHttpRequest();\r\n\
+			xhr1.open(\'POST\', \'http://localhost/\', true);\r\n\
+			xhr1.send(\"amount\");\r\n\
+			xhr1.onreadystatechange = function() {\r\n\
+				if (xhr1.readyState == XMLHttpRequest.DONE) {\r\n\
+					amount = +xhr1.responseText;\r\n\
 				}\r\n\
 			}\r\n\
 		}\r\n\
@@ -252,7 +302,7 @@ Content-type: text/html\r\n\
 			var inputs = document.getElementsByTagName(\"input\");\r\n\
 			var xhr = new XMLHttpRequest();\r\n\
 			xhr.open(\'POST\', \'http://localhost/\', true);\r\n\
-			xhr.send(\"insert into Гостиница (ФИО, Паспорт, \\\"Дата заезда\\\", \\\"Дата отъезда\\\", Номер) values (\\\'\" + inputs[1].value + \"\\\', \\\'\" + inputs[2].value + \"\\\', \\\'\" + inputs[3].value + \"\\\', \\\'\" + inputs[4].value + \"\\\', \" + inputs[5].value + \");\");\r\n\
+			xhr.send(\"insert into Гостиница (ФИО, Паспорт, \\\"Дата заезда\\\", \\\"Дата отъезда\\\", Номер) values (\\\'\" + inputs[1].value + \"\\\', \\\'\" + inputs[2].value + \"\\\', \\\'\" + inputs[3].value + \"\\\', \\\'\" + inputs[4].value + \"\\\', \" + inputs[5].value + \");\" + offset + \"/\" + limit + \"$\");\r\n\
 			xhr.onreadystatechange = function() {\r\n\
 				if (xhr.readyState == XMLHttpRequest.DONE) {\r\n\
 					document.body.getElementsByTagName(\'div\')[0].remove();\r\n\
@@ -264,7 +314,18 @@ Content-type: text/html\r\n\
 						inputs[i].addEventListener(\"click\", tdClickListener);\r\n\
 						inputs[i].addEventListener(\"keypress\", enterKeyListener);\r\n\
 					}\r\n\
-					blockEditInput = false;}}\r\n\
+					blockEditInput = false;\r\n\
+					//amount++;\r\n\
+				}\r\n\
+			}\r\n\
+			var xhr1 = new XMLHttpRequest();\r\n\
+			xhr1.open(\'POST\', \'http://localhost/\', true);\r\n\
+			xhr1.send(\"amount\");\r\n\
+			xhr1.onreadystatechange = function() {\r\n\
+				if (xhr1.readyState == XMLHttpRequest.DONE) {\r\n\
+					amount = +xhr1.responseText;\r\n\
+				}\r\n\
+			}\r\n\
 		}\r\n\
 	}\r\n\
 	function addButtonListener() {\r\n\
@@ -287,6 +348,48 @@ Content-type: text/html\r\n\
 		if (blockEditInput == false) {\r\n\
 			del = true;\r\n\
 			blockEditInput = true;\r\n\
+		}\r\n\
+	}\r\n\
+	function prevButtonListener() {\r\n\
+		if (offset != 0 && blockEditInput == false) {\r\n\
+			offset -= 5;\r\n\
+			var xhr = new XMLHttpRequest();\r\n\
+			xhr.open(\'POST\', \'http://localhost/\', true);\r\n\
+			xhr.send(\"select * from Гостиница;\" + offset + \"/\" + limit + \"$\");\r\n\
+			xhr.onreadystatechange = function() {\r\n\
+				if (xhr.readyState == XMLHttpRequest.DONE) {\r\n\
+					document.body.getElementsByTagName(\'div\')[0].remove();\r\n\
+					var div = document.createElement(\'div\');\r\n\
+					div.innerHTML = xhr.responseText;\r\n\
+					document.body.insertBefore(div, document.body.getElementsByTagName(\'button\')[4]);\r\n\
+					var inputs = document.getElementsByTagName(\"td\");\r\n\
+					for (var i = 0; i < inputs.length; i++) {\r\n\
+						inputs[i].addEventListener(\"click\", tdClickListener);\r\n\
+						inputs[i].addEventListener(\"keypress\", enterKeyListener);\r\n\
+					}\r\n\
+				}\r\n\
+			}\r\n\
+		}\r\n\
+	}\r\n\
+	function nextButtonListener() {\r\n\
+		if (offset + 5 < amount && blockEditInput == false) {\r\n\
+			offset += 5;\r\n\
+			var xhr = new XMLHttpRequest();\r\n\
+			xhr.open(\'POST\', \'http://localhost/\', true);\r\n\
+			xhr.send(\"select * from Гостиница;\" + offset + \"/\" + limit + \"$\");\r\n\
+			xhr.onreadystatechange = function() {\r\n\
+				if (xhr.readyState == XMLHttpRequest.DONE) {\r\n\
+					document.body.getElementsByTagName(\'div\')[0].remove();\r\n\
+					var div = document.createElement(\'div\');\r\n\
+					div.innerHTML = xhr.responseText;\r\n\
+					document.body.insertBefore(div, document.body.getElementsByTagName(\'button\')[4]);\r\n\
+					var inputs = document.getElementsByTagName(\"td\");\r\n\
+					for (var i = 0; i < inputs.length; i++) {\r\n\
+						inputs[i].addEventListener(\"click\", tdClickListener);\r\n\
+						inputs[i].addEventListener(\"keypress\", enterKeyListener);\r\n\
+					}\r\n\
+				}\r\n\
+			}\r\n\
 		}\r\n\
 	}\r\n\
 </script>\r\n\
