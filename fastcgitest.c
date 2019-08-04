@@ -205,6 +205,43 @@ Content-type: text/html\r\n\
 		if (i == 3) { return \"\\\"Дата отъезда\\\"\"; }\r\n\
 		if (i == 4) { return \"Номер\"; }\r\n\
 	}\r\n\
+	function xhrSend (s) {
+		var xhr = new XMLHttpRequest();\r\n\
+		xhr.open(\'POST\', \'http://localhost/\', true);\r\n\
+		xhr.send(s);\r\n\
+		xhr.onreadystatechange = function() {\r\n\
+			if (xhr.readyState == XMLHttpRequest.DONE) {\r\n\
+				document.body.getElementsByTagName(\'div\')[0].remove();\r\n\
+				var div = document.createElement(\'div\');\r\n\
+				div.innerHTML = xhr.responseText;\r\n\
+				document.body.insertBefore(div, document.body.getElementsByTagName(\'button\')[4]);\r\n\
+				var inputs = document.getElementsByTagName(\"td\");\r\n\
+				for (var i = 0; i < inputs.length; i++) {\r\n\
+					inputs[i].addEventListener(\"click\", tdClickListener);\r\n\
+					inputs[i].addEventListener(\"keypress\", enterKeyListener);\r\n\
+				}\r\n\
+				var ths = document.getElementsByTagName(\"th\");\r\n\
+				for (var i = 0; i < ths.length; i++) {\r\n\
+					ths[i].addEventListener(\"click\", thClickListener);\r\n\
+				}\r\n\
+			}\r\n\
+		}\r\n\
+	}
+	//function transformNameToNumber(i) {\r\n\
+		//if (i == \"ФИО\") { return 0; }\r\n\
+		//if (i == \"Паспорт\") { return 1; }\r\n\
+		//if (i == \"\\\"Дата заезда\\\"\") { return 2; }\r\n\
+		//if (i == \"\\\"Дата отъезда\\\"\") { return 3; }\r\n\
+		//if (i == \"Номер\") { return 4; }\r\n\
+	//}\r\n\
+	function transformBoolToOrder(i) {\r\n\
+		if (!i) {\r\n\
+			return \"asc\";\r\n\
+		}\r\n\
+		else {\r\n\
+			return \"desc\";\r\n\
+		}\r\n\
+	}\r\n\
 	var offset = 0;\r\n\
 	var limit = 5;\r\n\
 	var blockEditInput = false;\r\n\
@@ -220,6 +257,9 @@ Content-type: text/html\r\n\
 	    	FCGX_PutS("\
 	;\r\n\
 	var inputs = document.getElementsByTagName(\"td\");\r\n\
+	var ths = document.getElementsByTagName(\"th\");\r\n\
+	var sort = null;\r\n\
+	var order = null;\r\n\
 	document.getElementById(\'add\').addEventListener(\"click\", addButtonListener);\r\n\
 	document.getElementById(\'del\').addEventListener(\"click\", deleteButtonListener);\r\n\
 	document.getElementById(\'prev\').addEventListener(\"click\", prevButtonListener);\r\n\
@@ -227,6 +267,9 @@ Content-type: text/html\r\n\
 	for (var i = 0; i < inputs.length; i++) {\r\n\
 		inputs[i].addEventListener(\"click\", tdClickListener);\r\n\
 		inputs[i].addEventListener(\"keypress\", enterKeyListener);\r\n\
+	}\r\n\
+	for (var i = 0; i < ths.length; i++) {\r\n\
+		ths[i].addEventListener(\"click\", thClickListener);\r\n\
 	}\r\n\
 	function enterKeyListener(e) {\r\n\
 		if (e.keyCode == 13) {\r\n\
@@ -376,7 +419,7 @@ Content-type: text/html\r\n\
 			offset += 5;\r\n\
 			var xhr = new XMLHttpRequest();\r\n\
 			xhr.open(\'POST\', \'http://localhost/\', true);\r\n\
-			xhr.send(\"select * from Гостиница;\" + offset + \"/\" + limit + \"$\");\r\n\
+			xhr.send(\"select * from Гостиница;\" + offset + \"/\" + limit + \"$\" + );\r\n\
 			xhr.onreadystatechange = function() {\r\n\
 				if (xhr.readyState == XMLHttpRequest.DONE) {\r\n\
 					document.body.getElementsByTagName(\'div\')[0].remove();\r\n\
@@ -391,6 +434,27 @@ Content-type: text/html\r\n\
 				}\r\n\
 			}\r\n\
 		}\r\n\
+	}\r\n\
+	function thClickListener() {\r\n\
+		var colName = content.replace(/[/\\]/gi, '');
+		if (sort === null) {
+			sort = colName;
+			order = false;
+		}
+		else if (sort == colName) {\r\n\
+			order = ~order;
+		}
+		else {
+			sort = colName;
+			order = false;
+		}
+		if (colName === \"Дата заезда\") {
+			colName = \"\\\"\" + colName + \"\\\"\";
+		}
+		else if (colName === \"Дата отъезда\") {
+			colName = \"\\\"\" + colName + \"\\\"\";
+		}
+		xhrSend(\"select * from Гостиница;\" + offset + \"/\" + limit + \"$\" + colName + \"*\" + transformBoolToOrder(order) + \".\");
 	}\r\n\
 </script>\r\n\
 </body>\r\n\
