@@ -23,9 +23,19 @@ void do_exit(PGconn *conn) {
 	if (i == 4) return "Номер";
 }*/
 
-void printTable(PGconn *conn, FCGX_Request request, char * offset, char * limit, char * sort, char * order) {
+void printTable(PGconn *conn, FCGX_Request request, char * offset, char * limit, char * sort, char * order, char * search, char * value) {
 	char * query = malloc(300);
 	strcpy(query, "select*from Гостиница");
+	if (strcmp(search, "null") != 0 && strcmp(value, "null") != 0) {
+		strcat(query, " where ");
+		strcat(query, search);
+		if (strcmp(search, "ФИО") != 0 && strcmp(search, "Паспорт") != 0) {
+			strcat(query, "::varchar(50)");
+		}
+		strcat(query, " like \'%");
+		strcat(query, value);
+		strcat(query, "%\'");
+	}
 	if (strcmp(sort, "null") != 0 && strcmp(order, "null") != 0) {
 		strcat(query, " order by ");
 		strcat(query, sort);
@@ -154,6 +164,8 @@ int main(void)
 		char * limit = malloc(10);
 		char * sort = malloc(50);
 		char * order = malloc(15);
+		char * search = malloc(50);
+		char * value = malloc(100);
 		FCGX_GetStr(buf, 500, request.in);
 		char * ach = strchr(buf, '\x3B');
 		printf("%ld", ach - buf + 1);
@@ -169,6 +181,10 @@ int main(void)
 			sort[strchr(buf, '~') - strchr(buf, '\x24') - 1] = '\0';
 			strncpy(order, strchr(buf, '~') + 1, strchr(buf, '.') - strchr(buf, '~') - 1);
 			order[strchr(buf, '.') - strchr(buf, '~') - 1] = '\0';
+			strncpy(search, strchr(buf, '.') + 1, strchr(buf, '!') - strchr(buf, '.') - 1);
+			search[strchr(buf, '!') - strchr(buf, '.') - 1] = '\0';
+			strncpy(value, strchr(buf, '!') + 1, strchr(buf, '?') - strchr(buf, '!') - 1);
+			value[strchr(buf, '?') - strchr(buf, '!') - 1] = '\0';
 			buf[(int)(ach - buf + 1)] = '\0';
 		}
 
@@ -181,7 +197,7 @@ int main(void)
 			printf("%s", buf);
 			FCGX_PutS("Content-type: text/html\r\n", request.out); 
 	        FCGX_PutS("\r\n", request.out); 
-			printTable(conn, request, offset, limit, sort, order);
+			printTable(conn, request, offset, limit, sort, order, search, value);
 			//FCGX_Finish_r(&request); 
 			//free(buf);
 		}
@@ -191,7 +207,7 @@ int main(void)
 			printf("%s", buf);
 			FCGX_PutS("Content-type: text/html\r\n", request.out); 
 	        FCGX_PutS("\r\n", request.out); 
-			printTable(conn, request, offset, limit, sort, order);
+			printTable(conn, request, offset, limit, sort, order, search, value);
 		}
 		else if (buf[0] == 'd' && buf[1] == 'e' && buf[2] == 'l') {
 			PQexec(conn, buf);
@@ -199,16 +215,34 @@ int main(void)
 			printf("%s", buf);
 			FCGX_PutS("Content-type: text/html\r\n", request.out); 
 	        FCGX_PutS("\r\n", request.out); 
-			printTable(conn, request, offset, limit, sort, order);
+			printTable(conn, request, offset, limit, sort, order, search, value);
 		}
 		else if (buf[0] == 's' && buf[1] == 'e' && buf[2] == 'l') {
 			FCGX_PutS("Content-type: text/html\r\n", request.out); 
 	        FCGX_PutS("\r\n", request.out); 
-			printTable(conn, request, offset, limit, sort, order);
+			printTable(conn, request, offset, limit, sort, order, search, value);
 		}
 		else if (buf[0] == 'a' && buf[1] == 'm' && buf[2] == 'o') {
 			char * str = malloc(10);
-			PGresult *res = PQexec(conn, "select * from Гостиница;");
+			char * query = malloc(300);
+			char * search1 = malloc(50);
+			char * value1 = malloc(100);
+			strncpy(search1, strchr(buf, '$') + 1, strchr(buf, '!') - strchr(buf, '$') - 1);
+			search1[strchr(buf, '!') - strchr(buf, '$') - 1] = '\0';
+			strncpy(value1, strchr(buf, '!') + 1, strchr(buf, '?') - strchr(buf, '!') - 1);
+			value1[strchr(buf, '?') - strchr(buf, '!') - 1] = '\0';
+			strcpy(query, "select*from Гостиница");
+			if (strcmp(search, "null") != 0 && strcmp(value1, "null") != 0) {
+				strcat(query, " where ");
+				strcat(query, search1);
+				if (strcmp(search1, "ФИО") != 0 && strcmp(search1, "Паспорт") != 0) {
+					strcat(query, "::varchar(50)");
+				}
+				strcat(query, " like \'%");
+				strcat(query, value1);
+				strcat(query, "%\'");
+			}
+			PGresult *res = PQexec(conn, query);
 			int row_num = PQntuples(res);
 			PQclear(res);
 			sprintf(str, "%d", row_num);
@@ -231,11 +265,18 @@ Content-type: text/html\r\n\
 <button id=\"file\">Добавить из файла</button>\r\n\
 <button id=\"pass\">Сменить пароль</button>\r\n\
 <br>\r\n\
-<input>\r\n\
+<input id=\"search\">\r\n\
+<select id=\"selectsearch\">\r\n\
+	<option selected value=\"ФИО\">Поиск по ФИО</option>\r\n\
+	<option value=\"Паспорт\">Поиск по паспорту</option>\r\n\
+	<option value=\"&quot;Дата заезда&quot;\">Поиск по дате заезда</option>\r\n\
+	<option value=\"&quot;Дата отъезда&quot;\">Поиск по дате отъезда</option>\r\n\
+	<option value=\"Номер\">Поиск по номеру</option>\r\n\
+</select>\r\n\
 <br>\r\n\
 <div>\
 ", request.out); 
-	    	printTable(conn, request, "0", "5", "null", "null");
+	    	printTable(conn, request, "0", "5", "null", "null", "null", "null");
 	    	//FCGX_PutS("<br>\r\n", request.out);
 	    	FCGX_PutS("\
 </div>\
@@ -318,10 +359,14 @@ Content-type: text/html\r\n\
 	var ths = document.getElementsByTagName(\"th\");\r\n\
 	var sort = \"null\";\r\n\
 	var order = \"null\";\r\n\
+	var searchVal = \"null\";\r\n\
+	var selectsearchVal = \"ФИО\";\r\n\
 	document.getElementById(\'add\').addEventListener(\"click\", addButtonListener);\r\n\
 	document.getElementById(\'del\').addEventListener(\"click\", deleteButtonListener);\r\n\
 	document.getElementById(\'prev\').addEventListener(\"click\", prevButtonListener);\r\n\
 	document.getElementById(\'next\').addEventListener(\"click\", nextButtonListener);\r\n\
+	document.getElementById(\'search\').addEventListener(\"keypress\", search);\r\n\
+	document.getElementById(\'selectsearch\').addEventListener(\"change\", updateSearchValues);\r\n\
 	for (var i = 0; i < inputs.length; i++) {\r\n\
 		inputs[i].addEventListener(\"click\", tdClickListener);\r\n\
 		inputs[i].addEventListener(\"keypress\", enterKeyListener);\r\n\
@@ -337,7 +382,7 @@ Content-type: text/html\r\n\
 			var val = document.getElementsByTagName(\'input\')[1].value;\r\n\
 			if (m[1] != 4) { val = \"\\\'\" + val + \"\\\'\"; }\r\n\
 			var colName = addQuotes(sort);\r\n\
-			xhrSend(\"update Гостиница set \" + transformNumberToName(m[1]) + \" = \" + val + \" where id = \" + m[0] + \";\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\");\r\n\
+			xhrSend(\"update Гостиница set \" + transformNumberToName(m[1]) + \" = \" + val + \" where id = \" + m[0] + \";\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
 			blockEditInput = false;\r\n\
 			", request.out);
 	    	//FCGX_PutS("if (xhr.status != 200) {\r\n", request.out);
@@ -360,10 +405,10 @@ Content-type: text/html\r\n\
 			var m;\r\n\
 			m = this.id.match(r);\r\n\
 			var colName = addQuotes(sort);\r\n\
-			xhrSend(\"delete from Гостиница where id = \" + m[0] + \";\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\");\r\n\
+			xhrSend(\"delete from Гостиница where id = \" + m[0] + \";\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
 			var xhr1 = new XMLHttpRequest();\r\n\
 			xhr1.open(\'POST\', \'http://localhost/\', true);\r\n\
-			xhr1.send(\"amount\");\r\n\
+			xhr1.send(\"amount$\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
 			xhr1.onreadystatechange = function() {\r\n\
 				if (xhr1.readyState == XMLHttpRequest.DONE) {\r\n\
 					amount = +xhr1.responseText;\r\n\
@@ -377,10 +422,10 @@ Content-type: text/html\r\n\
 		if (e.keyCode == 13) {\r\n\
 			var inputs = document.getElementsByTagName(\"input\");\r\n\
 			var colName = addQuotes(sort);\r\n\
-			xhrSend(\"insert into Гостиница (ФИО, Паспорт, \\\"Дата заезда\\\", \\\"Дата отъезда\\\", Номер) values (\\\'\" + inputs[1].value + \"\\\', \\\'\" + inputs[2].value + \"\\\', \\\'\" + inputs[3].value + \"\\\', \\\'\" + inputs[4].value + \"\\\', \" + inputs[5].value + \");\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\");\r\n\
+			xhrSend(\"insert into Гостиница (ФИО, Паспорт, \\\"Дата заезда\\\", \\\"Дата отъезда\\\", Номер) values (\\\'\" + inputs[1].value + \"\\\', \\\'\" + inputs[2].value + \"\\\', \\\'\" + inputs[3].value + \"\\\', \\\'\" + inputs[4].value + \"\\\', \" + inputs[5].value + \");\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
 			var xhr1 = new XMLHttpRequest();\r\n\
 			xhr1.open(\'POST\', \'http://localhost/\', true);\r\n\
-			xhr1.send(\"amount\");\r\n\
+			xhr1.send(\"amount$\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
 			xhr1.onreadystatechange = function() {\r\n\
 				if (xhr1.readyState == XMLHttpRequest.DONE) {\r\n\
 					amount = +xhr1.responseText;\r\n\
@@ -415,14 +460,14 @@ Content-type: text/html\r\n\
 		if (offset != 0 && blockEditInput == false) {\r\n\
 			offset -= 5;\r\n\
 			var colName = addQuotes(sort);\r\n\
-			xhrSend(\"select * from Гостиница;\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\");\r\n\
+			xhrSend(\"select * from Гостиница;\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
 		}\r\n\
 	}\r\n\
 	function nextButtonListener() {\r\n\
 		if (offset + 5 < amount && blockEditInput == false) {\r\n\
 			offset += 5;\r\n\
 			var colName = addQuotes(sort);\r\n\
-			xhrSend(\"select * from Гостиница;\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\");\r\n\
+			xhrSend(\"select * from Гостиница;\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
 		}\r\n\
 	}\r\n\
 	function thClickListener() {\r\n\
@@ -444,7 +489,29 @@ Content-type: text/html\r\n\
 		else if (colName === \"Дата отъезда\") {\r\n\
 			colName = \"\\\"\" + colName + \"\\\"\";\r\n\
 		}\r\n\
-		xhrSend(\"select * from Гостиница;\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\");\r\n\
+		xhrSend(\"select * from Гостиница;\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
+	}\r\n\
+	function search(e) {\r\n\
+		if (e.keyCode == 13) {\r\n\
+			searchVal = this.value;\r\n\
+			if (searchVal == \"\") {\r\n\
+				searchVal = \"null\";\r\n\
+			}\r\n\
+			offset = 0;\r\n\
+			var colName = addQuotes(sort);\r\n\
+			xhrSend(\"select * from Гостиница;\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
+			var xhr1 = new XMLHttpRequest();\r\n\
+			xhr1.open(\'POST\', \'http://localhost/\', true);\r\n\
+			xhr1.send(\"amount$\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
+			xhr1.onreadystatechange = function() {\r\n\
+				if (xhr1.readyState == XMLHttpRequest.DONE) {\r\n\
+					amount = +xhr1.responseText;\r\n\
+				}\r\n\
+			}\r\n\
+		}\r\n\
+	}\r\n\
+	function updateSearchValues() {\r\n\
+		selectsearchVal = this.value;\r\n\
 	}\r\n\
 </script>\r\n\
 </body>\r\n\
