@@ -136,10 +136,11 @@ int main(void)
 	}
 	printf("Request is inited\n");
 
-	PGconn *conn = PQconnectdb("user=postgres password=postgres dbname=hw");
+	PGconn *conn = PQconnectdb("user=oleg password=oleg dbname=hw");
 	if (PQstatus(conn) == CONNECTION_BAD) {
     
-    	fprintf(stderr, "Connection to database failed: %s\n", PQerrorMessage(conn));
+    	//fprintf(stderr, "Connection to database failed: %s\n", PQerrorMessage(conn));
+    	printf("Connection to database failed: %s\n", PQerrorMessage(conn));
     	do_exit(conn);
 	}
 
