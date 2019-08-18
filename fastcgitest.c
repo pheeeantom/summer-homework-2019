@@ -270,8 +270,23 @@ int main(void)
 		}
 		else if (buf[0] == 'f' && buf[1] == 'i' && buf[2] == 'l') {
 			//printf("%s", buf + 4);
-			PQexec(conn, buf + 4);
-			printf("%s", PQerrorMessage(conn));
+			char * buf1 = malloc(300);
+			char * buf2 = malloc(200);
+			char * p;
+			char * pp = buf + 4;
+			do {
+				p = strchr(pp, ';');
+				if (p != NULL) {
+					strcpy(buf1, "insert into Гостиница(ФИО, Паспорт, \"Дата заезда\", \"Дата отъезда\", Номер) values ");
+					strncpy(buf2, pp, p - pp + 1);
+					strcat(buf1, buf2);
+					PQexec(conn, buf1);
+					printf("%s", PQerrorMessage(conn));
+				}
+				pp = p + 1;
+			} while (p != NULL);
+			free(buf1);
+			free(buf2);
 			FCGX_PutS("Content-type: text/html\r\n", request.out); 
 	        FCGX_PutS("\r\n", request.out); 
 			printTable(conn, request, offset, limit, sort, order, search, value);
