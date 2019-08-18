@@ -23,6 +23,21 @@ void do_exit(PGconn *conn) {
 	if (i == 4) return "Номер";
 }*/
 
+void parseRequest(char * ach, char * buf, char * offset, char * limit, char * sort, char * order, char * search, char * value) {
+	strncpy(offset, ach + 1, (strchr(buf, '\x2F') - buf) - (ach - buf + 1));
+	offset[(strchr(buf, '\x2F') - buf) - (ach - buf + 1)] = '\0';
+	strncpy(limit, strchr(buf, '\x2F') + 1, strchr(buf, '\x24') - strchr(buf, '\x2F') - 1);
+	limit[strchr(buf, '\x24') - strchr(buf, '\x2F') - 1] = '\0';
+	strncpy(sort, strchr(buf, '\x24') + 1, strchr(buf, '~') - strchr(buf, '\x24') - 1);
+	sort[strchr(buf, '~') - strchr(buf, '\x24') - 1] = '\0';
+	strncpy(order, strchr(buf, '~') + 1, strchr(buf, '.') - strchr(buf, '~') - 1);
+	order[strchr(buf, '.') - strchr(buf, '~') - 1] = '\0';
+	strncpy(search, strchr(buf, '.') + 1, strchr(buf, '!') - strchr(buf, '.') - 1);
+	search[strchr(buf, '!') - strchr(buf, '.') - 1] = '\0';
+	strncpy(value, strchr(buf, '!') + 1, strchr(buf, '?') - strchr(buf, '!') - 1);
+	value[strchr(buf, '?') - strchr(buf, '!') - 1] = '\0';
+}
+
 void printTable(PGconn *conn, FCGX_Request request, char * offset, char * limit, char * sort, char * order, char * search, char * value) {
 	char * query = malloc(300);
 	strcpy(query, "select*from Гостиница");
@@ -160,33 +175,35 @@ int main(void)
         //server_name = FCGX_GetParam("SERVER_NAME", request.envp); 
 		//char * clStr = FCGX_GetParam("CONTENT_LENGTH", request.envp);
 		//int cl = atoi(clStr);
-		char * buf = malloc(500);
+		char * buf = malloc(1000);
 		char * offset = malloc(10);
 		char * limit = malloc(10);
 		char * sort = malloc(50);
 		char * order = malloc(15);
 		char * search = malloc(50);
 		char * value = malloc(100);
-		FCGX_GetStr(buf, 500, request.in);
-		char * ach = strchr(buf, '\x3B');
-		printf("%ld", ach - buf + 1);
-		if (ach - buf + 1 < 0) {
+		FCGX_GetStr(buf, 1000, request.in);
+		if (!(buf[0] == 'f' && buf[1] == 'i' && buf[2] == 'l')) {
+			char * ach = strchr(buf, '\x3B');
+			printf("%ld", ach - buf + 1);
+			if (ach - buf + 1 < 0) {
 
+			}
+			else {
+				parseRequest(ach, buf, offset, limit, sort, order, search, value);
+				buf[(int)(ach - buf + 1)] = '\0';
+			}
 		}
 		else {
-			strncpy(offset, ach + 1, (strchr(buf, '\x2F') - buf) - (ach - buf + 1));
-			offset[(strchr(buf, '\x2F') - buf) - (ach - buf + 1)] = '\0';
-			strncpy(limit, strchr(buf, '\x2F') + 1, strchr(buf, '\x24') - strchr(buf, '\x2F') - 1);
-			limit[strchr(buf, '\x24') - strchr(buf, '\x2F') - 1] = '\0';
-			strncpy(sort, strchr(buf, '\x24') + 1, strchr(buf, '~') - strchr(buf, '\x24') - 1);
-			sort[strchr(buf, '~') - strchr(buf, '\x24') - 1] = '\0';
-			strncpy(order, strchr(buf, '~') + 1, strchr(buf, '.') - strchr(buf, '~') - 1);
-			order[strchr(buf, '.') - strchr(buf, '~') - 1] = '\0';
-			strncpy(search, strchr(buf, '.') + 1, strchr(buf, '!') - strchr(buf, '.') - 1);
-			search[strchr(buf, '!') - strchr(buf, '.') - 1] = '\0';
-			strncpy(value, strchr(buf, '!') + 1, strchr(buf, '?') - strchr(buf, '!') - 1);
-			value[strchr(buf, '?') - strchr(buf, '!') - 1] = '\0';
-			buf[(int)(ach - buf + 1)] = '\0';
+			char * ach = strchr(buf, '@');
+			printf("%ld", ach - buf);
+			if (ach - buf < 0) {
+
+			}
+			else {
+				parseRequest(ach, buf, offset, limit, sort, order, search, value);
+				buf[(int)(ach - buf)] = '\0';
+			}
 		}
 
 		//buf[strlen(buf)] = '\0';
@@ -251,6 +268,14 @@ int main(void)
 	        FCGX_PutS("\r\n", request.out); 
 			FCGX_PutS(str, request.out);
 		}
+		else if (buf[0] == 'f' && buf[1] == 'i' && buf[2] == 'l') {
+			//printf("%s", buf + 4);
+			PQexec(conn, buf + 4);
+			printf("%s", PQerrorMessage(conn));
+			FCGX_PutS("Content-type: text/html\r\n", request.out); 
+	        FCGX_PutS("\r\n", request.out); 
+			printTable(conn, request, offset, limit, sort, order, search, value);
+		}
 		else {
 	        FCGX_PutS("\
 Content-type: text/html\r\n\
@@ -264,6 +289,7 @@ Content-type: text/html\r\n\
 <button id=\"del\">Удалить</button>\r\n\
 <button id=\"add\">Добавить</button>\r\n\
 <button id=\"file\">Добавить из файла</button>\r\n\
+<input id=\"fileinput\" type=\"file\" style=\"display:none;\" />\r\n\
 <button id=\"pass\">Сменить пароль</button>\r\n\
 <br>\r\n\
 <input id=\"search\">\r\n\
@@ -366,6 +392,8 @@ Content-type: text/html\r\n\
 	document.getElementById(\'del\').addEventListener(\"click\", deleteButtonListener);\r\n\
 	document.getElementById(\'prev\').addEventListener(\"click\", prevButtonListener);\r\n\
 	document.getElementById(\'next\').addEventListener(\"click\", nextButtonListener);\r\n\
+	document.getElementById(\'file\').addEventListener(\"click\", fileButtonListener);\r\n\
+	document.getElementById(\'fileinput\').addEventListener(\'change\', getFile);\r\n\
 	document.getElementById(\'search\').addEventListener(\"keypress\", search);\r\n\
 	document.getElementById(\'selectsearch\').addEventListener(\"change\", updateSearchValues);\r\n\
 	for (var i = 0; i < inputs.length; i++) {\r\n\
@@ -380,7 +408,7 @@ Content-type: text/html\r\n\
 			var r = /\\d+/g;\r\n\
 			var m;\r\n\
 			m = this.id.match(r);\r\n\
-			var val = document.getElementsByTagName(\'input\')[1].value;\r\n\
+			var val = document.getElementsByTagName(\'input\')[2].value;\r\n\
 			if (m[1] != 4) { val = \"\\\'\" + val + \"\\\'\"; }\r\n\
 			var colName = addQuotes(sort);\r\n\
 			xhrSend(\"update Гостиница set \" + transformNumberToName(m[1]) + \" = \" + val + \" where id = \" + m[0] + \";\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
@@ -423,7 +451,7 @@ Content-type: text/html\r\n\
 		if (e.keyCode == 13) {\r\n\
 			var inputs = document.getElementsByTagName(\"input\");\r\n\
 			var colName = addQuotes(sort);\r\n\
-			xhrSend(\"insert into Гостиница (ФИО, Паспорт, \\\"Дата заезда\\\", \\\"Дата отъезда\\\", Номер) values (\\\'\" + inputs[1].value + \"\\\', \\\'\" + inputs[2].value + \"\\\', \\\'\" + inputs[3].value + \"\\\', \\\'\" + inputs[4].value + \"\\\', \" + inputs[5].value + \");\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
+			xhrSend(\"insert into Гостиница (ФИО, Паспорт, \\\"Дата заезда\\\", \\\"Дата отъезда\\\", Номер) values (\\\'\" + inputs[2].value + \"\\\', \\\'\" + inputs[3].value + \"\\\', \\\'\" + inputs[4].value + \"\\\', \\\'\" + inputs[5].value + \"\\\', \" + inputs[6].value + \");\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
 			var xhr1 = new XMLHttpRequest();\r\n\
 			xhr1.open(\'POST\', \'http://localhost/\', true);\r\n\
 			xhr1.send(\"amount$\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
@@ -442,7 +470,7 @@ Content-type: text/html\r\n\
 			newTr.innerHTML = \"<td><input style=\\\"width: \" + ths[0].offsetWidth + \";\\\"></td><td><input style=\\\"width: \" + ths[1].offsetWidth + \";\\\"></td><td><input style=\\\"width: \" + ths[2].offsetWidth + \";\\\"></td><td><input style=\\\"width: \" + ths[3].offsetWidth + \";\\\"></td><td><input style=\\\"width: \" + ths[4].offsetWidth + \";\\\"></td>\";\r\n\
 			document.getElementsByTagName(\'table\')[0].appendChild(newTr);\r\n\
 			var inputs = document.getElementsByTagName(\"input\");\r\n\
-			for (var i = 1; i < inputs.length; i++) {\r\n\
+			for (var i = 2; i < inputs.length; i++) {\r\n\
 				inputs[i].addEventListener(\"keypress\", enterKeyListenerAdd);\r\n\
 				inputs[i].style.padding = 0;\r\n\
 				inputs[i].style.border = 0;\r\n\
@@ -513,6 +541,19 @@ Content-type: text/html\r\n\
 	}\r\n\
 	function updateSearchValues() {\r\n\
 		selectsearchVal = this.value;\r\n\
+	}\r\n\
+	function fileButtonListener() {\r\n\
+		document.getElementById(\'fileinput\').click();\r\n\
+	}\r\n\
+	function getFile(e) {\r\n\
+		var fileToLoad = document.getElementById(\"fileinput\").files[0];\r\n\
+  		var fileReader = new FileReader();\r\n\
+  		fileReader.onload = function(fileLoadedEvent){\r\n\
+      		var textFromFileLoaded = fileLoadedEvent.target.result;\r\n\
+      		var colName = addQuotes(sort);\r\n\
+      		xhrSend(\"file\" + textFromFileLoaded + \"@\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
+  		};\r\n\
+  		fileReader.readAsText(fileToLoad, \"UTF-8\");\r\n\
 	}\r\n\
 </script>\r\n\
 </body>\r\n\
