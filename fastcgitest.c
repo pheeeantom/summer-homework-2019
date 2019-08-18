@@ -151,13 +151,7 @@ int main(void)
 	}
 	printf("Request is inited\n");
 
-	PGconn *conn = PQconnectdb("user=oleg password=oleg dbname=hw");
-	if (PQstatus(conn) == CONNECTION_BAD) {
-    
-    	//fprintf(stderr, "Connection to database failed: %s\n", PQerrorMessage(conn));
-    	printf("Connection to database failed: %s\n", PQerrorMessage(conn));
-    	do_exit(conn);
-	}
+	PGconn *conn;
 
 	for(;;)
 	{
@@ -184,14 +178,22 @@ int main(void)
 		char * value = malloc(100);
 		FCGX_GetStr(buf, 1000, request.in);
 		if (!(buf[0] == 'f' && buf[1] == 'i' && buf[2] == 'l')) {
-			char * ach = strchr(buf, '\x3B');
-			printf("%ld", ach - buf + 1);
-			if (ach - buf + 1 < 0) {
+			if (!(buf[0] == 'm' && buf[1] == 'a' && buf[2] == 'i')) {
+				if (!(buf[0] == 'i' && buf[1] == 'n' && buf[2] == 'i')) {
+					if (!(buf[0] == 'c' && buf[1] == 'h' && buf[2] == 'e')) {
+						if (!(buf[0] == 'n' && buf[1] == 'e' && buf[2] == 'w')) {
+							char * ach = strchr(buf, '\x3B');
+							printf("%ld", ach - buf + 1);
+							if (ach - buf + 1 < 0) {
 
-			}
-			else {
-				parseRequest(ach, buf, offset, limit, sort, order, search, value);
-				buf[(int)(ach - buf + 1)] = '\0';
+							}
+							else {
+								parseRequest(ach, buf, offset, limit, sort, order, search, value);
+								buf[(int)(ach - buf + 1)] = '\0';
+							}
+						}
+					}
+				}
 			}
 		}
 		else {
@@ -291,8 +293,8 @@ int main(void)
 	        FCGX_PutS("\r\n", request.out); 
 			printTable(conn, request, offset, limit, sort, order, search, value);
 		}
-		else {
-	        FCGX_PutS("\
+		else if (buf[0] == 'm' && buf[1] == 'a' && buf[2] == 'i') {
+			FCGX_PutS("\
 Content-type: text/html\r\n\
 \r\n\
 <html>\r\n\
@@ -365,6 +367,11 @@ Content-type: text/html\r\n\
 			}\r\n\
 		}\r\n\
 	}\r\n\
+	function updatePass(str) {\r\n\
+		var xhr = new XMLHttpRequest();\r\n\
+		xhr.open(\'POST\', \'http://localhost/\', true);\r\n\
+		xhr.send(\"newpass\" + str + \"\\0\");\r\n\
+	}\r\n\
 	//function transformNameToNumber(i) {\r\n\
 		//if (i == \"ФИО\") { return 0; }\r\n\
 		//if (i == \"Паспорт\") { return 1; }\r\n\
@@ -408,6 +415,7 @@ Content-type: text/html\r\n\
 	document.getElementById(\'prev\').addEventListener(\"click\", prevButtonListener);\r\n\
 	document.getElementById(\'next\').addEventListener(\"click\", nextButtonListener);\r\n\
 	document.getElementById(\'file\').addEventListener(\"click\", fileButtonListener);\r\n\
+	document.getElementById(\'pass\').addEventListener(\"click\", changePass);\r\n\
 	document.getElementById(\'fileinput\').addEventListener(\'change\', getFile);\r\n\
 	document.getElementById(\'search\').addEventListener(\"keypress\", search);\r\n\
 	document.getElementById(\'selectsearch\').addEventListener(\"change\", updateSearchValues);\r\n\
@@ -570,6 +578,10 @@ Content-type: text/html\r\n\
   		};\r\n\
   		fileReader.readAsText(fileToLoad, \"UTF-8\");\r\n\
 	}\r\n\
+	function changePass() {\r\n\
+		var str = prompt(\"Введите новый пароль\");\r\n\
+		updatePass(str);\r\n\
+	}\r\n\
 </script>\r\n\
 </body>\r\n\
 </html>\r\n\
@@ -579,6 +591,99 @@ Content-type: text/html\r\n\
 	        //FCGX_Finish_r(&request); 
 	        
 	        //завершающие действия - запись статистики, логгирование ошибок и т.п.
+		}
+		else if (buf[0] == 'c' && buf[1] == 'h' && buf[2] == 'e') {
+			char * query = malloc(300);
+			strcpy(query, "user=oleg password=");
+			strcat(query, buf + 5);
+			strcat(query, " dbname=hw");
+			conn = PQconnectdb(query);
+			free(query);
+			if (PQstatus(conn) == CONNECTION_BAD) {
+    			//fprintf(stderr, "Connection to database failed: %s\n", PQerrorMessage(conn));
+    			printf("Connection to database failed: %s\n", PQerrorMessage(conn));
+    			//do_exit(conn);
+    			FCGX_PutS("\
+Content-type: text/html\r\n\
+\r\n\
+no\r\n\
+				", request.out);
+			}
+			else {
+				FCGX_PutS("\
+Content-type: text/html\r\n\
+\r\n\
+yes\r\n\
+				", request.out);
+			}
+		}
+		else if (buf[0] == 'n' && buf[1] == 'e' && buf[2] == 'w') {
+			PGconn *postgres = PQconnectdb("user=postgres password=postgres dbname=hw");
+			if (PQstatus(postgres) == CONNECTION_BAD) {
+    			printf("Connection to database failed: %s\n", PQerrorMessage(postgres));
+    			PQfinish(postgres);
+    		}
+    		else {
+    			char * query = malloc(300);
+    			strcpy(query, "alter user oleg with encrypted password \'");
+    			strcat(query, buf + 7);
+    			strcat(query, "\';");
+    			PGresult *res = PQexec(postgres, query);
+    			PQclear(res);
+    			PQfinish(postgres);
+    		}
+		}
+		else {
+			FCGX_PutS("\
+Content-type: text/html\r\n\
+\r\n\
+<html>\r\n\
+<head>\r\n\
+<meta charset=\"utf-8\">\r\n\
+<title>База данных гостиницы</title>\r\n\
+</head>\r\n\
+<body>\r\n\
+Пароль:<input type=\"password\">\r\n\
+<script>\r\n\
+var answer;\r\n\
+function xhrSend (s) {\r\n\
+    var xhr = new XMLHttpRequest();\r\n\
+    xhr.open(\'POST\', \'http://localhost/\', true);\r\n\
+    xhr.send(s);\r\n\
+    xhr.onreadystatechange = function() {\r\n\
+        if (xhr.readyState == XMLHttpRequest.DONE) {\r\n\
+            document.open();\r\n\
+            document.write(xhr.responseText);\r\n\
+            document.close();\r\n\
+        }\r\n\
+    }\r\n\
+}\r\n\
+function getAnswer (s) {\r\n\
+	var xhr = new XMLHttpRequest();\r\n\
+    xhr.open(\'POST\', \'http://localhost/\', true);\r\n\
+    xhr.send(s);\r\n\
+    xhr.onreadystatechange = function() {\r\n\
+        if (xhr.readyState == XMLHttpRequest.DONE) {\r\n\
+            answer = xhr.responseText;\r\n\
+            if (answer == \"no\\r\\n\\t\\t\\t\\t\") {\r\n\
+				alert(\"Неверный пароль!\");\r\n\
+			}\r\n\
+			else if (answer == \"yes\\r\\n\\t\\t\\t\\t\") {\r\n\
+				xhrSend(\"main\");\r\n\
+			}\r\n\
+        }\r\n\
+    }\r\n\
+}\r\n\
+document.getElementsByTagName(\'input\')[0].addEventListener(\"keypress\", checkPass);\r\n\
+function checkPass(e) {\r\n\
+	if (e.keyCode == 13) {\r\n\
+		getAnswer(\"check\" + document.getElementsByTagName(\"input\")[0].value + \"\\0\");\r\n\
+	}\r\n\
+}\r\n\
+</script>\r\n\
+</body>\r\n\
+</html>\r\n\
+			", request.out);
         } 
 	}
 	PQfinish(conn);
