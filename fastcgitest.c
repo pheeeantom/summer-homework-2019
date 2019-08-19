@@ -213,29 +213,67 @@ int main(void)
 
 		if (buf[0] == 'u' && buf[1] == 'p' && buf[2] == 'd') {
 			PQexec(conn, buf);
-			printf("%s", PQerrorMessage(conn));
+			char * error = malloc(300);
+			strcpy(error, PQerrorMessage(conn));
 			printf("%s", buf);
 			FCGX_PutS("Content-type: text/html\r\n", request.out); 
 	        FCGX_PutS("\r\n", request.out); 
 			printTable(conn, request, offset, limit, sort, order, search, value);
+			if (strlen(error) != 0) {
+				FCGX_PutS("<p>",request.out);
+				FCGX_PutS(error, request.out);
+				FCGX_PutS("</p>\r\n", request.out);
+			}
+			else {
+				FCGX_PutS("<p>",request.out);
+				FCGX_PutS("Обновлена строка", request.out);
+				FCGX_PutS("</p>\r\n", request.out);
+			}
+			free(error);
 			//FCGX_Finish_r(&request); 
 			//free(buf);
 		}
 		else if (buf[0] == 'i' && buf[1] == 'n' && buf[2] == 's') {
 			PQexec(conn, buf);
+			char * error = malloc(300);
+			strcpy(error, PQerrorMessage(conn));
 			printf("%s", PQerrorMessage(conn));
 			printf("%s", buf);
 			FCGX_PutS("Content-type: text/html\r\n", request.out); 
 	        FCGX_PutS("\r\n", request.out); 
 			printTable(conn, request, offset, limit, sort, order, search, value);
+			if (strlen(error) != 0) {
+				FCGX_PutS("<p>",request.out);
+				FCGX_PutS(error, request.out);
+				FCGX_PutS("</p>\r\n", request.out);
+			}
+			else {
+				FCGX_PutS("<p>",request.out);
+				FCGX_PutS("Добавлена строка", request.out);
+				FCGX_PutS("</p>\r\n", request.out);
+			}
+			free(error);
 		}
 		else if (buf[0] == 'd' && buf[1] == 'e' && buf[2] == 'l') {
 			PQexec(conn, buf);
+			char * error = malloc(300);
+			strcpy(error, PQerrorMessage(conn));
 			printf("%s", PQerrorMessage(conn));
 			printf("%s", buf);
 			FCGX_PutS("Content-type: text/html\r\n", request.out); 
 	        FCGX_PutS("\r\n", request.out); 
 			printTable(conn, request, offset, limit, sort, order, search, value);
+			if (strlen(error) != 0) {
+				FCGX_PutS("<p>",request.out);
+				FCGX_PutS(error, request.out);
+				FCGX_PutS("</p>\r\n", request.out);
+			}
+			else {
+				FCGX_PutS("<p>",request.out);
+				FCGX_PutS("Удалена строка", request.out);
+				FCGX_PutS("</p>\r\n", request.out);
+			}
+			free(error);
 		}
 		else if (buf[0] == 's' && buf[1] == 'e' && buf[2] == 'l') {
 			FCGX_PutS("Content-type: text/html\r\n", request.out); 
@@ -272,6 +310,7 @@ int main(void)
 		}
 		else if (buf[0] == 'f' && buf[1] == 'i' && buf[2] == 'l') {
 			//printf("%s", buf + 4);
+			char * error = malloc(300);
 			char * buf1 = malloc(300);
 			char * buf2 = malloc(200);
 			char * p;
@@ -284,6 +323,7 @@ int main(void)
 					strcat(buf1, buf2);
 					PQexec(conn, buf1);
 					printf("%s", PQerrorMessage(conn));
+					strcpy(error, PQerrorMessage(conn));
 				}
 				pp = p + 1;
 			} while (p != NULL);
@@ -292,6 +332,17 @@ int main(void)
 			FCGX_PutS("Content-type: text/html\r\n", request.out); 
 	        FCGX_PutS("\r\n", request.out); 
 			printTable(conn, request, offset, limit, sort, order, search, value);
+			if (strlen(error) != 0) {
+				FCGX_PutS("<p>",request.out);
+				FCGX_PutS(error, request.out);
+				FCGX_PutS("</p>\r\n", request.out);
+			}
+			else {
+				FCGX_PutS("<p>",request.out);
+				FCGX_PutS("Добавлены строкаи", request.out);
+				FCGX_PutS("</p>\r\n", request.out);
+			}
+			free(error);
 		}
 		else if (buf[0] == 'm' && buf[1] == 'a' && buf[2] == 'i') {
 			FCGX_PutS("\
@@ -410,6 +461,8 @@ Content-type: text/html\r\n\
 	var order = \"null\";\r\n\
 	var searchVal = \"null\";\r\n\
 	var selectsearchVal = \"ФИО\";\r\n\
+	document.getElementById(\'search\').value = \"\";\r\n\
+	document.getElementById(\'selectsearch\').selectedIndex = 0;\r\n\
 	document.getElementById(\'add\').addEventListener(\"click\", addButtonListener);\r\n\
 	document.getElementById(\'del\').addEventListener(\"click\", deleteButtonListener);\r\n\
 	document.getElementById(\'prev\').addEventListener(\"click\", prevButtonListener);\r\n\
@@ -450,6 +503,7 @@ Content-type: text/html\r\n\
 			var newInput = document.createElement(\'input\');\r\n\
 			newInput.style = \"padding: 0; border: 0; margin: 0; width: \" + len + \"px\";\r\n\
 			document.getElementById(this.id).appendChild(newInput);\r\n\
+			document.getElementsByTagName(\'input\')[2].focus();\r\n\
 			blockEditInput = true;\r\n\
 		}\r\n\
 		if (del == true) {\r\n\
@@ -464,9 +518,15 @@ Content-type: text/html\r\n\
 			xhr1.onreadystatechange = function() {\r\n\
 				if (xhr1.readyState == XMLHttpRequest.DONE) {\r\n\
 					amount = +xhr1.responseText;\r\n\
+					if (amount != 0 && amount % 5 == 0 && offset != 0) {\r\n\
+						offset -= 5;\r\n\
+						var colName = addQuotes(sort);\r\n\
+						xhrSend(\"select * from Гостиница;\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
+					}\r\n\
 				}\r\n\
 			}\r\n\
 			del = false;\r\n\
+			//document.getElementById(\'del\').style.background = \"#000000\";\r\n\
 			blockEditInput = false;\r\n\
 		}\r\n\
 	}\r\n\
@@ -499,12 +559,14 @@ Content-type: text/html\r\n\
 				inputs[i].style.border = 0;\r\n\
 				inputs[i].style.margin = 0;\r\n\
 			}\r\n\
+			inputs[2].focus();\r\n\
 			blockEditInput = true;\r\n\
 		}\r\n\
 	}\r\n\
 	function deleteButtonListener() {\r\n\
 		if (blockEditInput == false) {\r\n\
 			del = true;\r\n\
+			//document.getElementById(\'del\').style.color = \"#00FF00\";\r\n\
 			blockEditInput = true;\r\n\
 		}\r\n\
 	}\r\n\
@@ -575,6 +637,14 @@ Content-type: text/html\r\n\
       		var textFromFileLoaded = fileLoadedEvent.target.result;\r\n\
       		var colName = addQuotes(sort);\r\n\
       		xhrSend(\"file\" + textFromFileLoaded + \"@\" + offset + \"/\" + limit + \"$\" + colName + \"~\" + transformBoolToOrder(order) + \".\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
+      		var xhr1 = new XMLHttpRequest();\r\n\
+			xhr1.open(\'POST\', \'http://localhost/\', true);\r\n\
+			xhr1.send(\"amount$\" + selectsearchVal + \"!\" + searchVal + \"?\");\r\n\
+			xhr1.onreadystatechange = function() {\r\n\
+				if (xhr1.readyState == XMLHttpRequest.DONE) {\r\n\
+					amount = +xhr1.responseText;\r\n\
+				}\r\n\
+			}\r\n\
   		};\r\n\
   		fileReader.readAsText(fileToLoad, \"UTF-8\");\r\n\
 	}\r\n\
